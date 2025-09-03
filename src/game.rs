@@ -7,13 +7,13 @@ use crate::enums::BOARD_SIZE;
 type Map<K, V> = HashMap<K, V>;
 
 #[derive(Debug)]
-struct Point {
+pub struct Point {
     x: i32,
     y: i32,
 }
 
 #[derive(Debug)]
-struct Impact {
+pub struct Impact {
     coords: Point,
     hit: bool
 }
@@ -23,6 +23,25 @@ struct Impact {
 pub enum Position {
     Horizontal { start_x: i32, end_x: i32, y: i32 },
     Vertical { start_y: i32, end_y: i32, x: i32 },
+}
+
+impl Position {
+    pub fn coordinates(&self) -> Vec<Point> {
+        let mut coords = Vec::new();
+        match self {
+            Position::Horizontal { start_x, end_x, y } => {
+                for x in *start_x..=*end_x {
+                    coords.push(Point { x, y: *y });
+                }
+            },
+            Position::Vertical { start_y, end_y, x } => {
+                for y in *start_y..=*end_y {
+                    coords.push(Point { x: *x, y });
+                }
+            },
+        }
+        coords
+    }
 }
 
 impl Default for Position {
@@ -45,16 +64,16 @@ pub enum Ship {
 // length and thus "HP" of a ship. This makes it easier to track which square "makes up" which ship.
 // Each player has a board struct for their side.
 #[derive(Debug)]
-struct Board {
-    occupied: [[bool; BOARD_SIZE]; BOARD_SIZE], // 2D array to track occupied squares
-    ships: Map<Ship, Position>,
-    impacts: HashSet<Impact>
+pub struct Board {
+    pub occupied: [[bool; BOARD_SIZE]; BOARD_SIZE], // 2D array to track occupied squares
+    pub ships: Map<Ship, Position>,
+    pub impacts: HashSet<Impact>
 }
 
 #[derive(Debug)]
 pub struct GameState {
-    player1_board: Board,
-    player2_board: Board
+    pub player1_board: Board,
+    pub player2_board: Board
 }
 
 pub fn auto_place_ships(player_placements: &mut Map<Ship, Position>) -> [[bool; BOARD_SIZE]; BOARD_SIZE] {
@@ -90,4 +109,30 @@ pub fn set_boards(player1_placements:Map<Ship, Position>, player1_occupied: [[bo
     let player2_board = Board{ occupied: player2_occupied, ships: player2_placements, impacts: HashSet::new() };
 
     return GameState { player1_board: player1_board, player2_board: player2_board };
+}
+
+pub fn draw_board(board: &Board) {
+    let mut display_board = [['.'; BOARD_SIZE]; BOARD_SIZE];
+
+    for (ship, pos) in &board.ships {
+        for coord in pos.coordinates() {
+            let display_unit = match ship {
+                Ship::Submarine { .. } => 's',
+                Ship::Destroyer { .. } => 'd',
+                Ship::Cruiser { .. } => 'c',
+                Ship::Battleship { .. } => 'B',
+                Ship::Carrier { .. } => 'C',
+            };
+            display_board[coord.y as usize][coord.x as usize] = display_unit;
+        }
+    }
+
+    println!("  0 1 2 3 4 5 6 7 8 9");
+    for y in 0..BOARD_SIZE {
+        print!("{} ", y);
+        for x in 0..BOARD_SIZE {
+            print!("{} ", display_board[y][x]);
+        }
+        println!();
+    }
 }

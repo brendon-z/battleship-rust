@@ -56,5 +56,18 @@ pub fn generate_random_position(ship_length: i32, occupied: &mut [[bool; BOARD_S
         }
     }
 
+    match pos {
+        Position::Horizontal { start_x, end_x, y } => {
+            for x in start_x..=end_x {
+                occupied[y as usize][x as usize] = true;
+            }
+        },
+        Position::Vertical { start_y, end_y, x } => {
+            for y in start_y..=end_y {
+                occupied[y as usize][x as usize] = true;
+            }
+        },
+    }
+
     return pos;
 }

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, io};
 use enums::OpponentChoice;
 
-use crate::{enums::{Choice, BOARD_SIZE}, game::{auto_place_ships, place_ships, set_boards, GameState, Position, Ship}};
+use crate::{enums::{Choice, BOARD_SIZE}, game::{auto_place_ships, draw_board, place_ships, set_boards, GameState, Position, Ship}};
 
 pub mod enums;
 pub mod game;
@@ -75,4 +75,7 @@ fn main() {
     }
 
     let mut game_state = set_boards(player_placements[0].clone(), player_occupied[0], player_placements[1].clone(), player_occupied[1]);
+
+    draw_board(&game_state.player1_board);
+
 }
