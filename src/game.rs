@@ -8,8 +8,8 @@ type Map<K, V> = HashMap<K, V>;
 
 #[derive(Debug)]
 pub struct Point {
-    x: i32,
-    y: i32,
+    pub x: i32,
+    pub y: i32,
 }
 
 #[derive(Debug)]
@@ -50,14 +50,41 @@ impl Default for Position {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, EnumIter)]
-pub enum Ship {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Ship {
+    pub health: Vec<bool>,
+    pub pos: Position,
+    pub ship_type: ShipType,
+}
+
+impl Ship {
+    pub fn sunk(&self) -> bool {
+        return self.health.iter().all(|&h| h == false);
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, EnumIter)]
+pub enum ShipType {
     Submarine { health: [bool; 1], pos: Position },
     Destroyer { health: [bool; 2], pos: Position },
     Cruiser { health: [bool; 3], pos: Position },
     Battleship { health: [bool; 4], pos: Position },
     Carrier { health: [bool; 5], pos: Position },
 }
+
+
+
+// impl Ship {
+//     pub fn hit(&self) -> Point {
+//         match self {
+//             Ship::Submarine { health, pos } => 1,
+//             Ship::Destroyer { .. } => 2,
+//             Ship::Cruiser { .. } => 3,
+//             Ship::Battleship { .. } => 4,
+//             Ship::Carrier { .. } => 5,
+//         }
+//     }
+// }
 
 // In Battleship, ships are placed on a board made up of a grid. Instead of implementing this as a 2D array with ships
 // "filling" grid squares, maintain a mapping of ship to position ranges, given ships are 1xn rectangles, where n is the
@@ -76,20 +103,32 @@ pub struct GameState {
     pub player2_board: Board
 }
 
+impl GameState {
+    pub fn all_ships_sunk(&self, player: i32) -> bool {
+        let board = if player == 1 { &self.player1_board } else { &self.player2_board };
+        let mut res = true;
+        for (ship, _) in &board.ships {
+            res = res && ship.sunk();
+        }
+        return res;
+    }
+}
+
 pub fn auto_place_ships(player_placements: &mut Map<Ship, Position>) -> [[bool; BOARD_SIZE]; BOARD_SIZE] {
     println!("Automatically placing ships...\n=============================");
 
     let mut occupied = [[false; BOARD_SIZE]; BOARD_SIZE];
-    for ship in Ship::iter() {
-        let ship_length = match ship {
-            Ship::Submarine { .. } => 1,
-            Ship::Destroyer { .. } => 2,
-            Ship::Cruiser { .. } => 3,
-            Ship::Battleship { .. } => 4,
-            Ship::Carrier { .. } => 5,
+    for ship_type in ShipType::iter() {
+        let ship_length = match ship_type {
+            ShipType::Submarine { .. } => 1,
+            ShipType::Destroyer { .. } => 2,
+            ShipType::Cruiser { .. } => 3,
+            ShipType::Battleship { .. } => 4,
+            ShipType::Carrier { .. } => 5,
         };
         let position = crate::helpers::generate_random_position(ship_length, &mut occupied);
-        println!("{:?} placed at {:?}", ship, position);
+        let ship = Ship { health: vec![true; ship_length as usize], pos: position, ship_type: ship_type };
+        println!("{:?} placed at {:?}", ship_type, position);
         player_placements.insert(ship, position);
     }
 
@@ -112,26 +151,45 @@ pub fn set_boards(player1_placements:Map<Ship, Position>, player1_occupied: [[bo
 }
 
 pub fn draw_board(board: &Board) {
-    let mut display_board = [['.'; BOARD_SIZE]; BOARD_SIZE];
-
-    for (ship, pos) in &board.ships {
-        for coord in pos.coordinates() {
-            let display_unit = match ship {
-                Ship::Submarine { .. } => 's',
-                Ship::Destroyer { .. } => 'd',
-                Ship::Cruiser { .. } => 'c',
-                Ship::Battleship { .. } => 'B',
-                Ship::Carrier { .. } => 'C',
-            };
-            display_board[coord.y as usize][coord.x as usize] = display_unit;
+    let mut impact_board: [[char; 10]; 10] = [['.'; BOARD_SIZE]; BOARD_SIZE];
+    for impact in &board.impacts {
+        if impact.hit {
+            impact_board[impact.coords.y as usize][impact.coords.x as usize] = 'X';
+        } else {
+            impact_board[impact.coords.y as usize][impact.coords.x as usize] = '.';
         }
     }
 
+    let mut ship_board: [[char; 10]; 10] = [['.'; BOARD_SIZE]; BOARD_SIZE];
+    for (ship, pos) in &board.ships {
+        for coord in pos.coordinates() {
+            let display_unit = match ship.ship_type {
+                ShipType::Submarine { .. } => 's',
+                ShipType::Destroyer { .. } => 'd',
+                ShipType::Cruiser { .. } => 'c',
+                ShipType::Battleship { .. } => 'B',
+                ShipType::Carrier { .. } => 'C',
+            };
+            ship_board[coord.y as usize][coord.x as usize] = display_unit;
+        }
+    }
+
+    println!("Impacts");
     println!("  0 1 2 3 4 5 6 7 8 9");
     for y in 0..BOARD_SIZE {
         print!("{} ", y);
         for x in 0..BOARD_SIZE {
-            print!("{} ", display_board[y][x]);
+            print!("{} ", impact_board[y][x]);
+        }
+        println!();
+    }
+    println!("---------------------");
+    println!("Your ships");
+    println!("  0 1 2 3 4 5 6 7 8 9");
+    for y in 0..BOARD_SIZE {
+        print!("{} ", y);
+        for x in 0..BOARD_SIZE {
+            print!("{} ", ship_board[y][x]);
         }
         println!();
     }
