@@ -1,7 +1,7 @@
-use std::{collections::HashMap, io};
+use std::{collections::HashMap, io::{self, Write}};
 use enums::OpponentChoice;
 
-use crate::{enums::{Choice, BOARD_SIZE}, game::{auto_place_ships, draw_board, place_ships, set_boards, GameState, Point, Position, Ship}};
+use crate::{enums::{Choice, BOARD_SIZE}, game::{auto_place_ships, place_ships, set_boards, GameState, Point, Position, Ship}};
 
 pub mod enums;
 pub mod game;
@@ -51,7 +51,9 @@ fn decide_autoplace() -> Choice {
     }  
 }
 
-fn strike_coordinates() -> Point {
+fn input_strike_coordinates() -> Point {
+    print!("Enter coordinates to strike (x,y): ");
+    io::stdout().flush().unwrap();
     loop {
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
@@ -89,12 +91,12 @@ fn main() {
     let opponent_choice = choose_opponent();
     println!("You have chosen to battle a {:?}.", opponent_choice);
 
-    let mut player_placements: Vec<HashMap<Ship, Position>> = Vec::new();
+    let mut player_placements: Vec<Vec<Ship>> = Vec::new();
     let mut player_occupied: Vec<[[bool; BOARD_SIZE]; BOARD_SIZE]> = Vec::new();
 
-    let player1_placements: HashMap<Ship, Position> = HashMap::new();
+    let player1_placements: Vec<Ship> = Vec::new();
     player_placements.push(player1_placements);
-    let player2_placements: HashMap<Ship, Position> = HashMap::new();
+    let player2_placements: Vec<Ship> = Vec::new();
     player_placements.push(player2_placements);
 
     for i in 1..=2 {
@@ -114,12 +116,21 @@ fn main() {
             println!("Player {}, it's your turn!", i);
             println!("==========================");
             if i == 1 {
-                draw_board(&game_state.player1_board);
+                game_state.draw_board(1);
             } else {
-                draw_board(&game_state.player2_board);
+                game_state.draw_board(2);
             }
-            println!("Enter coordinates to strike (x,y): ");
-            let strike_coords = strike_coordinates();
+
+            loop {
+                let strike_coords = input_strike_coordinates();
+
+                if !game_state.already_struck(i, strike_coords) {
+                    game_state.register_strike(i, strike_coords);
+                    break;
+                }
+                println!("You have already struck this coordinate. Try again.");
+            }
+            println!();
         }
         println!();
     }
