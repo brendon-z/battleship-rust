@@ -1,8 +1,9 @@
-use std::{collections::{HashMap, HashSet}};
+use core::fmt;
+use std::{collections::{HashMap, HashSet}, ffi::os_str::Display, io};
 use strum_macros::{EnumIter};
 use strum::IntoEnumIterator;
 
-use crate::enums::BOARD_SIZE;
+use crate::{enums::{Direction, BOARD_SIZE}, helpers::{check_position_valid, input_coordinates, input_ship_positon}};
 
 type Map<K, V> = HashMap<K, V>;
 
@@ -83,6 +84,18 @@ pub enum ShipType {
     Cruiser { health: [bool; 3], pos: Position },
     Battleship { health: [bool; 4], pos: Position },
     Carrier { health: [bool; 5], pos: Position },
+}
+
+impl fmt::Display for ShipType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ShipType::Submarine { .. } => write!(f, "Submarine"),
+            ShipType::Destroyer { .. } => write!(f, "Destroyer"),
+            ShipType::Cruiser { .. } => write!(f, "Cruiser"),
+            ShipType::Battleship { .. } => write!(f, "Battleship"),
+            ShipType::Carrier { .. } => write!(f, "Carrier"),
+        }
+    }
 }
 
 
@@ -229,7 +242,37 @@ pub fn auto_place_ships(player_placements: &mut Vec<Ship>) -> [[bool; BOARD_SIZE
 
 pub fn place_ships(player: i32, player_placements: &mut Vec<Ship>) -> [[bool; BOARD_SIZE]; BOARD_SIZE] {
     println!("Player {:?}, place your ships.\n=============================", player);
-    todo!();
+
+    let mut occupied = [[false; BOARD_SIZE]; BOARD_SIZE];
+    for ship_type in ShipType::iter() {
+        let ship_length = match ship_type {
+            ShipType::Submarine { .. } => 1,
+            ShipType::Destroyer { .. } => 2,
+            ShipType::Cruiser { .. } => 3,
+            ShipType::Battleship { .. } => 4,
+            ShipType::Carrier { .. } => 5,
+        };
+
+        let mut position;
+        loop {
+            println!("Place your {} (length {})", ship_type, ship_length);
+            position = input_ship_positon(ship_length);
+            if check_position_valid(&position, &occupied) {
+                break;
+            }
+            println!("Ship overlaps another, please choose another position.");
+        }
+
+        for coord in position.coordinates() {
+            occupied[coord.y as usize][coord.x as usize] = true;
+        }
+
+        let ship = Ship { health: vec![true; ship_length as usize], pos: position, ship_type: ship_type };
+        player_placements.push(ship);
+        println!();
+    }
+
+    return occupied;
 }
 
 pub fn set_boards(player1_placements:Vec<Ship>, player1_occupied: [[bool; BOARD_SIZE]; BOARD_SIZE], player2_placements:Vec<Ship>, player2_occupied: [[bool; BOARD_SIZE]; BOARD_SIZE]) -> GameState {

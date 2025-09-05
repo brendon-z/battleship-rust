@@ -1,7 +1,8 @@
-use std::{collections::HashMap, io::{self, Write}};
+use std::io::{self, Write};
+
 use enums::OpponentChoice;
 
-use crate::{enums::{Choice, BOARD_SIZE}, game::{auto_place_ships, place_ships, set_boards, GameState, Point, Position, Ship}};
+use crate::{enums::{Choice, BOARD_SIZE}, game::{auto_place_ships, place_ships, set_boards, Ship}, helpers::input_coordinates};
 
 pub mod enums;
 pub mod game;
@@ -9,7 +10,9 @@ pub mod helpers;
 
 fn choose_opponent() -> OpponentChoice {
     loop {
-        println!("Do you want to play against a human or a computer (NOT IMPLEMENTED YET)?");
+        print!("Do you want to play against a human or a computer (NOT IMPLEMENTED YET)? ");
+        io::stdout().flush().unwrap();
+
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
             Ok(_) => {
@@ -26,21 +29,22 @@ fn choose_opponent() -> OpponentChoice {
                 println!("Failed to read input, try again.");
             }
         }
+        println!();
     }
 }
 
-fn decide_autoplace() -> Choice {
+fn decide_autoplace(player: i32) -> Choice {
     loop {
-        println!("Automatically place your ships?");
+        print!("Player {}, do you want to automatically place your ships? ", player);
+        io::stdout().flush().unwrap();
+
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
             Ok(_) => {
                 let answer = input.trim();
                 match answer.to_lowercase().as_str() {
                     "yes" => { return Choice::Yes },
-                    "no" => {
-                        println!("Manual ship placements not implemented yet!");
-                    },
+                    "no" => { return Choice::No },
                     _ => { println!("Invalid option, please answer with [yes/no]!") }
                 }
             },
@@ -48,48 +52,14 @@ fn decide_autoplace() -> Choice {
                 println!("Failed to read input, try again.");
             }
         }
-    }  
-}
-
-fn input_strike_coordinates() -> Point {
-    print!("Enter coordinates to strike (x,y): ");
-    io::stdout().flush().unwrap();
-    loop {
-        let mut input = String::new();
-        match io::stdin().read_line(&mut input) {
-            Ok(_) => {
-                let coords: Vec<&str> = input.trim().split(',').collect();
-                if coords.len() != 2 {
-                    println!("Invalid input, please enter coordinates in the format x,y");
-                    continue;
-                }
-                let x = match coords[0].parse::<i32>() {
-                    Ok(num) if num >= 0 && num < BOARD_SIZE as i32 => num,
-                    _ => {
-                        println!("Invalid x coordinate, please enter a number between 0 and {}", BOARD_SIZE - 1);
-                        continue;
-                    }
-                };
-                let y = match coords[1].parse::<i32>() {
-                    Ok(num) if num >= 0 && num < BOARD_SIZE as i32 => num,
-                    _ => {
-                        println!("Invalid y coordinate, please enter a number between 0 and {}", BOARD_SIZE - 1);
-                        continue;
-                    }
-                };
-                return Point { x, y };
-            },
-            Err(_) => {
-                println!("Failed to read input, try again.");
-            }
-        }
+        println!();
     }
 }
 
 fn main() {
     println!("Welcome to Battleship, implemented in Rust.");
     let opponent_choice = choose_opponent();
-    println!("You have chosen to battle a {:?}.", opponent_choice);
+    println!("You have chosen to battle a {:?}.\n", opponent_choice);
 
     let mut player_placements: Vec<Vec<Ship>> = Vec::new();
     let mut player_occupied: Vec<[[bool; BOARD_SIZE]; BOARD_SIZE]> = Vec::new();
@@ -101,7 +71,9 @@ fn main() {
 
     for i in 1..=2 {
         let occupied: [[bool; BOARD_SIZE]; BOARD_SIZE];
-        let auto_place = decide_autoplace();
+        let auto_place = decide_autoplace(i);
+        println!();
+
         match auto_place {
             Choice::Yes => { occupied = auto_place_ships(&mut player_placements[(i - 1) as usize]); },
             Choice::No => { occupied = place_ships(i, &mut player_placements[(i - 1) as usize]); }
@@ -122,7 +94,7 @@ fn main() {
             }
 
             loop {
-                let strike_coords = input_strike_coordinates();
+                let strike_coords = input_coordinates();
 
                 if !game_state.already_struck(i, strike_coords) {
                     game_state.register_strike(i, strike_coords);
@@ -149,5 +121,4 @@ fn main() {
 
     println!("Player {}'s hit statistics:", winning_player);
     println!("{} successful hits out of {} total strikes made, with - a {}% hit rate", hit_stats.0, hit_stats.1, hit_stats.0 as f32 / hit_stats.1 as f32 * 100.0);
-
 }
