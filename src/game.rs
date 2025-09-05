@@ -97,6 +97,19 @@ pub struct Board {
     pub impacts: HashSet<Impact>
 }
 
+impl Board {
+    // Returns stats about hits made by a particular player (total hits, total attacks launcehd)
+    pub fn hit_stats(&self) -> (i32, i32) {
+        let mut hit_count = 0;
+        for impact in &self.impacts {
+            if impact.hit {
+                hit_count += 1;
+            }
+        }
+        return (hit_count, self.impacts.len() as i32);
+    }
+}
+
 #[derive(Debug)]
 pub struct GameState {
     pub player1_board: Board,

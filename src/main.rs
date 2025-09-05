@@ -135,4 +135,19 @@ fn main() {
         println!();
     }
 
+    let winning_player;
+    let hit_stats;
+    if game_state.all_ships_sunk(1) {
+        winning_player = 2;
+        println!("Player 2 wins!");
+        hit_stats = game_state.player2_board.hit_stats();
+    } else {
+        winning_player = 1;
+        println!("Player 1 wins!");
+        hit_stats = game_state.player1_board.hit_stats();
+    }
+
+    println!("Player {}'s hit statistics:", winning_player);
+    println!("{} successful hits out of {} total strikes made, with - a {}% hit rate", hit_stats.0, hit_stats.1, hit_stats.0 as f32 / hit_stats.1 as f32 * 100.0);
+
 }
