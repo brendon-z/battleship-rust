@@ -1,11 +1,9 @@
 use core::fmt;
-use std::{collections::{HashMap, HashSet}, ffi::os_str::Display, io};
+use std::{collections::{HashSet}};
 use strum_macros::{EnumIter};
 use strum::IntoEnumIterator;
 
-use crate::{enums::{Direction, BOARD_SIZE}, helpers::{check_position_valid, input_coordinates, input_ship_positon}};
-
-type Map<K, V> = HashMap<K, V>;
+use crate::{enums::{BOARD_SIZE}, helpers::{check_position_valid, input_ship_positon}};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Point {
