@@ -3,7 +3,7 @@ use std::{collections::{HashSet}};
 use strum_macros::{EnumIter};
 use strum::IntoEnumIterator;
 
-use crate::{enums::{BOARD_SIZE}, helpers::{check_position_valid, input_ship_positon}};
+use crate::{enums::BOARD_SIZE, game, helpers::{check_position_valid, input_coordinates, input_ship_positon}, player::{AIPlayer, Player, RandomSelect, TargetingAlgorithm}};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Point {
@@ -13,8 +13,8 @@ pub struct Point {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Impact {
-    coords: Point,
-    hit: bool
+    pub coords: Point,
+    pub hit: bool
 }
 
 // Position enum enforces constraint that ships must be placed horizontally or vertically, not diagonally.
@@ -107,68 +107,33 @@ pub struct Board {
     pub ships: Vec<Ship>,
     pub impacts: HashSet<Impact>
 }
-
 impl Board {
-    // Returns stats about hits made by a particular player (total hits, total attacks launcehd)
-    pub fn hit_stats(&self) -> (i32, i32) {
-        let mut hit_count = 0;
-        for impact in &self.impacts {
-            if impact.hit {
-                hit_count += 1;
-            }
-        }
-        return (hit_count, self.impacts.len() as i32);
-    }
-}
-
-#[derive(Debug)]
-pub struct GameState {
-    pub player1_board: Board,
-    pub player2_board: Board
-}
-
-impl GameState {
-    pub fn all_ships_sunk(&self, player: i32) -> bool {
-        let board = if player == 1 { &self.player1_board } else { &self.player2_board };
-        let mut res = true;
-        for ship in &board.ships {
-            res = res && ship.sunk();
-        }
-        return res;
+    pub fn new(occupied: [[bool; BOARD_SIZE]; BOARD_SIZE], ships: Vec<Ship>) -> Board {
+        Board { occupied: occupied, ships, impacts: HashSet::new() }
     }
 
-    pub fn already_struck(&self, player: i32, strike_coords: Point) -> bool {
-        let board = if player == 1 { &self.player1_board } else { &self.player2_board };
-        return board.impacts.iter().any(|impact| impact.coords.x == strike_coords.x && impact.coords.y == strike_coords.y);
-    }
-
-    pub fn register_strike(&mut self, player: i32, strike_coords: Point) -> bool {
-        let (board, opponent_board) = if player == 1 {
-            (&mut self.player1_board, &mut self.player2_board)
-        } else {
-            (&mut self.player2_board, &mut self.player1_board)
-        };
-
+    pub fn register_strike(&mut self, strike_coords: Point) -> bool {
         let mut hit = false;
-        for ship in opponent_board.ships.iter_mut() {
+        for ship in self.ships.iter_mut() {
             if ship.hit(&strike_coords) {
                 hit = true;
-                println!("Hit!");
                 break;
             }
         }
-        if !hit {
-            println!("Miss!");
-        }
-        board.impacts.insert(Impact { coords: strike_coords, hit });
-        return true;
+        return hit;
     }
 
-    pub fn draw_board(&self, player: i32) {
-        let board = if player == 1 { &self.player1_board } else { &self.player2_board };
+    pub fn all_ships_sunk(&self) -> bool {
+        return self.ships.iter().all(|ship| ship.sunk());
+    }
+    
+    pub fn already_struck(&self, strike_coords: Point) -> bool {
+        return self.impacts.iter().any(|impact| impact.coords.x == strike_coords.x && impact.coords.y == strike_coords.y);
+    }
 
+    pub fn draw_board(&self) {
         let mut impact_board: [[char; 10]; 10] = [['.'; BOARD_SIZE]; BOARD_SIZE];
-        for impact in &board.impacts {
+        for impact in &self.impacts {
             if impact.hit {
                 impact_board[impact.coords.y as usize][impact.coords.x as usize] = 'X';
             } else {
@@ -177,7 +142,7 @@ impl GameState {
         }
 
         let mut ship_board: [[char; 10]; 10] = [['.'; BOARD_SIZE]; BOARD_SIZE];
-        for ship in &board.ships {
+        for ship in &self.ships {
             for (coord, index) in ship.pos.coordinates().iter().zip(0..) {
                 let display_unit;
                 if !ship.health[index] {
@@ -214,6 +179,21 @@ impl GameState {
             }
             println!();
         }
+    }
+}
+
+pub struct GameState {
+    player1: Box<dyn Player>,
+    player2: Box<dyn Player>
+}
+
+impl GameState {
+    pub fn new(player1: Box<dyn Player>, player2: Box<dyn Player>) -> GameState {
+        GameState { player1, player2 }
+    }
+
+    pub fn game_over(&self) -> bool {
+        return self.player1.get_board().all_ships_sunk() || self.player2.get_board().all_ships_sunk();
     }
 }
 
@@ -273,9 +253,77 @@ pub fn place_ships(player: i32, player_placements: &mut Vec<Ship>) -> [[bool; BO
     return occupied;
 }
 
-pub fn set_boards(player1_placements:Vec<Ship>, player1_occupied: [[bool; BOARD_SIZE]; BOARD_SIZE], player2_placements:Vec<Ship>, player2_occupied: [[bool; BOARD_SIZE]; BOARD_SIZE]) -> GameState {
-    let player1_board = Board{ occupied: player1_occupied, ships: player1_placements.clone(), impacts: HashSet::new() };
-    let player2_board = Board{ occupied: player2_occupied, ships: player2_placements.clone(), impacts: HashSet::new() };
+pub fn human_v_human(game_state: &mut GameState) {
+    while !game_state.game_over() {
+        for i in 1..=2 {
+            println!("Player {}, it's your turn!", i);
+            println!("==========================");
+            let player;
+            let opponent;
+            if i == 1 {
+                player = &mut game_state.player1;
+                opponent = &mut game_state.player2;
+            } else {
+                player = &mut game_state.player2;
+                opponent = &mut game_state.player1;
+            }
+            player.get_board().draw_board();
+            player.attack(opponent);
+        }
+    }
 
-    return GameState { player1_board: player1_board, player2_board: player2_board };
+    let winning_player;
+    let hit_stats;
+    if game_state.player1.get_board().all_ships_sunk() {
+        winning_player = 2;
+        println!("Player 2 wins!");
+        hit_stats = game_state.player2.hit_stats();
+    } else {
+        winning_player = 1;
+        println!("Player 1 wins!");
+        hit_stats = game_state.player1.hit_stats();
+    }
+
+    println!("Player {}'s hit statistics:", winning_player);
+    println!("{} successful hits out of {} total strikes made, - a {}% hit rate", hit_stats.0, hit_stats.1, hit_stats.0 as f32 / hit_stats.1 as f32 * 100.0);
+}
+
+pub fn human_v_ai(game_state: &mut GameState) {
+    while !game_state.game_over() {
+        for i in 1..=2 {
+            let player;
+            let opponent;
+            if i == 1 {
+                player = &mut game_state.player1;
+                opponent = &mut game_state.player2;
+            } else {
+                player = &mut game_state.player2;
+                opponent = &mut game_state.player1;
+            }
+            
+            if player.as_any().is::<AIPlayer>() {
+                println!("AI is making its move...");
+            } else {
+                println!("Player {}, it's your turn!", i);
+                println!("==========================");
+                player.get_board().draw_board();
+            }
+            player.attack(opponent);
+        }
+    }
+
+    let winning_player;
+    let hit_stats;
+    if game_state.player1.get_board().all_ships_sunk() {
+        winning_player = 2;
+        println!("The AI wins!");
+        hit_stats = game_state.player2.hit_stats();
+    } else {
+        winning_player = 1;
+        println!("You win!");
+        hit_stats = game_state.player1.hit_stats();
+    }
+
+    println!("Player {}'s hit statistics:", winning_player);
+    println!("{} successful hits out of {} total strikes made, - a {}% hit rate", hit_stats.0, hit_stats.1, hit_stats.0 as f32 / hit_stats.1 as f32 * 100.0);
 }
