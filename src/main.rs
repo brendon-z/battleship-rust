@@ -1,16 +1,17 @@
-use std::io::{self, Write};
+use std::{io::{self, Write}};
 
 use enums::OpponentChoice;
 
-use crate::{enums::{Choice, BOARD_SIZE}, game::{auto_place_ships, place_ships, set_boards, Ship}, helpers::input_coordinates};
+use crate::{enums::{Choice, BOARD_SIZE}, game::{auto_place_ships, human_v_ai, human_v_human, place_ships, Board, GameState, Ship}, player::{AIPlayer, HumanPlayer, RandomSelect}};
 
 pub mod enums;
 pub mod game;
 pub mod helpers;
+pub mod player;
 
 fn choose_opponent() -> OpponentChoice {
     loop {
-        print!("Do you want to play against a human or a computer (NOT IMPLEMENTED YET)? ");
+        print!("Do you want to play against a human or a computer? ");
         io::stdout().flush().unwrap();
 
         let mut input = String::new();
@@ -20,7 +21,7 @@ fn choose_opponent() -> OpponentChoice {
                 match answer {
                     "human" => { return OpponentChoice::Human },
                     "computer" => {
-                        println!("Computer opponents are not implemented yet.");
+                        return OpponentChoice::AI;
                     },
                     _ => { println!("Invalid option!") }
                 }
@@ -81,44 +82,18 @@ fn main() {
         player_occupied.push(occupied);
     }
 
-    let mut game_state = set_boards(player_placements[0].clone(), player_occupied[0], player_placements[1].clone(), player_occupied[1]);
+    let human_player1 = HumanPlayer::new(1, Board::new(player_occupied[0], player_placements[0].clone()));
 
-    while !game_state.all_ships_sunk(1) && !game_state.all_ships_sunk(2) {
-        for i in 1..=2 {
-            println!("Player {}, it's your turn!", i);
-            println!("==========================");
-            if i == 1 {
-                game_state.draw_board(1);
-            } else {
-                game_state.draw_board(2);
-            }
-
-            loop {
-                let strike_coords = input_coordinates();
-
-                if !game_state.already_struck(i, strike_coords) {
-                    game_state.register_strike(i, strike_coords);
-                    break;
-                }
-                println!("You have already struck this coordinate. Try again.");
-            }
-            println!();
+    match opponent_choice {
+        OpponentChoice::Human => {
+            let human_player2 = HumanPlayer::new(2, Board::new(player_occupied[1], player_placements[1].clone()));
+            let mut game_state = GameState::new(Box::new(human_player1), Box::new(human_player2));
+            human_v_human(&mut game_state);
+        },
+        OpponentChoice::AI => {
+            let ai_player2 = AIPlayer::new(2, Board::new(player_occupied[1], player_placements[1].clone()), Box::new(RandomSelect));
+            let mut game_state = GameState::new(Box::new(human_player1), Box::new(ai_player2));
+            human_v_ai(&mut game_state);
         }
-        println!();
     }
-
-    let winning_player;
-    let hit_stats;
-    if game_state.all_ships_sunk(1) {
-        winning_player = 2;
-        println!("Player 2 wins!");
-        hit_stats = game_state.player2_board.hit_stats();
-    } else {
-        winning_player = 1;
-        println!("Player 1 wins!");
-        hit_stats = game_state.player1_board.hit_stats();
-    }
-
-    println!("Player {}'s hit statistics:", winning_player);
-    println!("{} successful hits out of {} total strikes made, with - a {}% hit rate", hit_stats.0, hit_stats.1, hit_stats.0 as f32 / hit_stats.1 as f32 * 100.0);
 }
